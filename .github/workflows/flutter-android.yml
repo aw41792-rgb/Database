@@ -1,0 +1,39 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: د کوډ ترلاسه کول
+        uses: actions/checkout@v4
+      - name: Flutter نصب کول
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: د Android پروژه جوړول
+        run: flutter create --platforms=android --org af.shalak.school .
+      - name: کتابتونونه ترلاسه کول
+        run: flutter pub get
+      - name: د کوډ تحلیل
+        run: flutter analyze
+      - name: ازموینې
+        run: flutter test
+      - name: Android APK جوړول
+        run: flutter build apk --release
+      - name: APK ساتل
+        uses: actions/upload-artifact@v4
+        with:
+          name: shalak-school-android-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
