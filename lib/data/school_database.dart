@@ -1,12 +1,31 @@
+import 'dart:io';
+
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class SchoolDatabase {
   SchoolDatabase._();
   static final SchoolDatabase instance = SchoolDatabase._();
   Database? _database;
+  Future<Database>? _databaseOpening;
+  static bool _desktopFactoryReady = false;
+
+  Future<void> _prepareDatabaseFactory() async {
+    if (!Platform.isWindows && !Platform.isLinux && !Platform.isMacOS) return;
+    if (_desktopFactoryReady) return;
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+    _desktopFactoryReady = true;
+  }
+
   Future<Database> get database async {
     if (_database != null) return _database!;
+    return _databaseOpening ??= _openDatabase();
+  }
+
+  Future<Database> _openDatabase() async {
+    await _prepareDatabaseFactory();
     final root = await getDatabasesPath();
     _database = await openDatabase(p.join(root,'shalak_school.db'),version:2,
       onCreate:(db,v) async => _createSchema(db),
