@@ -115,6 +115,10 @@ class _HomeScreenState extends State<HomeScreen> {
               color: const Color(0xFF008C95), onTap: () => _open(const AttendanceScreen()),
             ),
             _moduleCard(
+              icon: Icons.fact_check_outlined, title: 'د ښوونکو حاضري', subtitle: 'د ښوونکو ورځنۍ حاضري او تاریخچه',
+              color: const Color(0xFF087F8C), onTap: () => _open(const StaffAttendanceScreen()),
+            ),
+            _moduleCard(
               icon: Icons.assignment_rounded, title: 'ازموینې', subtitle: 'د ازموینو نوم، ډول، ټولګی او تعلیمي کال',
               color: const Color(0xFF8A5AB5), onTap: () => _open(const SchoolModuleScreen(
                 title: 'ازموینې', table: 'exams',
@@ -168,6 +172,68 @@ class _HomeScreenState extends State<HomeScreen> {
                   ModuleField('status','حالت'),
                 ],
               )),
+            ),
+            _moduleCard(
+              icon: Icons.event_busy_rounded, title: 'رخصتۍ او احکام', subtitle: 'د ښوونکو او زده‌کوونکو د رخصتیو ثبت',
+              color: const Color(0xFFB06A45), onTap: () => _open(const SchoolModuleScreen(
+                title: 'رخصتۍ او احکام', table: 'leaves',
+                fields: [
+                  ModuleField('person_type','د شخص ډول',required:true),
+                  ModuleField('person_name','نوم',required:true),
+                  ModuleField('leave_type','د رخصتۍ ډول'),
+                  ModuleField('start_date','د پیل نېټه',required:true),
+                  ModuleField('end_date','د پای نېټه',required:true),
+                  ModuleField('reason','د رخصتۍ دلیل'),
+                  ModuleField('decision','د پرېکړې حالت'),
+                  ModuleField('order_number','د حکم شمېره'),
+                ],
+              )),
+            ),
+            _moduleCard(
+              icon: Icons.transfer_within_a_station_rounded, title: 'د زده‌کوونکو تبدیلۍ', subtitle: 'د تبدیلۍ نېټه، مقصد او مکتوب',
+              color: const Color(0xFF5375A5), onTap: () => _open(const SchoolModuleScreen(
+                title: 'د زده‌کوونکو تبدیلۍ', table: 'student_transfers',
+                fields: [
+                  ModuleField('student_id','د زده‌کوونکي پېژند نمبر',required:true,number:true),
+                  ModuleField('transfer_date','د تبدیلۍ نېټه',required:true),
+                  ModuleField('destination','مقصد ښوونځی',required:true),
+                  ModuleField('letter_number','د مکتوب شمېره'),
+                  ModuleField('reason','د تبدیلۍ دلیل'),
+                  ModuleField('note','یادښت'),
+                ],
+              )),
+            ),
+            _moduleCard(
+              icon: Icons.account_balance_wallet_rounded, title: 'مالي ثبت', subtitle: 'عواید، لګښتونه او د اسنادو شمېره',
+              color: const Color(0xFF3F8066), onTap: () => _open(const SchoolModuleScreen(
+                title: 'مالي ثبت', table: 'finance',
+                fields: [
+                  ModuleField('transaction_type','عواید / لګښت',required:true),
+                  ModuleField('amount','مبلغ',required:true,number:true),
+                  ModuleField('transaction_date','نېټه',required:true),
+                  ModuleField('category','د معاملې ډول'),
+                  ModuleField('source_or_recipient','له چا / چاته'),
+                  ModuleField('document_number','د سند شمېره'),
+                  ModuleField('note','یادښت'),
+                ],
+              )),
+            ),
+            _moduleCard(
+              icon: Icons.event_available_rounded, title: 'رسمي رخصتۍ', subtitle: 'د رخصتیو نوم او د پیل او پای نېټه',
+              color: const Color(0xFF92713A), onTap: () => _open(const SchoolModuleScreen(
+                title: 'رسمي رخصتۍ', table: 'holidays',
+                fields: [
+                  ModuleField('title','د رخصتۍ نوم',required:true),
+                  ModuleField('start_date','د پیل نېټه',required:true),
+                  ModuleField('end_date','د پای نېټه',required:true),
+                  ModuleField('holiday_type','ډول'),
+                  ModuleField('note','یادښت'),
+                ],
+              )),
+            ),
+            _moduleCard(
+              icon: Icons.settings_rounded, title: 'د ښوونځي تنظیمات', subtitle: 'د ښوونځي نوم او تعلیمي کال',
+              color: const Color(0xFF64748B), onTap: () => _open(const SettingsScreen()),
             ),
             _moduleCard(
               icon: Icons.bar_chart_rounded, title: 'راپورونه او احصائیه', subtitle: 'د ښوونځي شمېرې او د ټولګیو راپورونه',
