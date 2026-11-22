@@ -10,7 +10,7 @@ void main() {
 
   testWidgets('د شلک ښوونځي اصلي پرده ښکاره کېږي', (tester) async {
     await tester.pumpWidget(const ShalakSchoolApp());
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('شلک منځنی ښوونځی'), findsOneWidget);
     expect(find.text('زده‌کوونکي'), findsOneWidget);
   });
