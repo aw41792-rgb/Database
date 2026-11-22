@@ -180,6 +180,71 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   );
 }
 
+
+class ResultsScreen extends StatefulWidget {
+  const ResultsScreen({super.key});
+  @override State<ResultsScreen> createState() => _ResultsScreenState();
+}
+class _ResultsScreenState extends State<ResultsScreen> {
+  List<Map<String,Object?>> students=[], exams=[], results=[];
+  int? studentId, examId;
+  final subject=TextEditingController(), score=TextEditingController();
+  @override void initState(){super.initState();_load();}
+  @override void dispose(){subject.dispose();score.dispose();super.dispose();}
+  Future<void> _load() async {
+    final db=SchoolDatabase.instance;
+    final s=await db.getStudents(), e=await db.rows('exams'), r=await db.rows('results');
+    if(mounted)setState((){students=s;exams=e;results=r;});
+  }
+  Future<void> _save() async {
+    if(studentId==null||examId==null||subject.text.trim().isEmpty||num.tryParse(score.text)==null)return;
+    await SchoolDatabase.instance.insert('results',{'student_id':studentId,'exam_id':examId,'subject':subject.text.trim(),'score':num.parse(score.text)});
+    subject.clear();score.clear();await _load();
+    if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('نمره ثبت شوه')));
+  }
+  @override Widget build(BuildContext context)=>Scaffold(
+    appBar:AppBar(title:const Text('د ازموینو پایلې او نمرې')),
+    body:ListView(padding:const EdgeInsets.all(12),children:[
+      if(students.isEmpty||exams.isEmpty) const Card(child:Padding(padding:EdgeInsets.all(12),child:Text('د نمرو له ثبت مخکې زده‌کوونکي او ازموینه ثبت کړئ.'))),
+      if(students.isNotEmpty) DropdownButtonFormField<int>(initialValue:studentId,decoration:const InputDecoration(labelText:'زده‌کوونکی'),items:students.map((s)=>DropdownMenuItem(value:s['id'] as int,child:Text('${s['name']} — ${s['basis_number']}'))).toList(),onChanged:(v)=>setState(()=>studentId=v)),
+      if(exams.isNotEmpty) DropdownButtonFormField<int>(initialValue:examId,decoration:const InputDecoration(labelText:'ازموینه'),items:exams.map((e)=>DropdownMenuItem(value:e['id'] as int,child:Text('${e['title']}'))).toList(),onChanged:(v)=>setState(()=>examId=v)),
+      const SizedBox(height:8),TextField(controller:subject,decoration:const InputDecoration(labelText:'مضمون')),
+      const SizedBox(height:8),TextField(controller:score,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'ترلاسه شوې نمرې')),
+      const SizedBox(height:8),FilledButton.icon(onPressed:_save,icon:const Icon(Icons.save),label:const Text('نمرې ثبتول')),
+      const Divider(height:28),const Text('ثبت شوې پایلې',style:TextStyle(fontWeight:FontWeight.bold,fontSize:18)),
+      for(final r in results) ListTile(title:Text('مضمون: ${r['subject']}'),subtitle:Text('زده‌کوونکی ID: ${r['student_id']} • ازموینه ID: ${r['exam_id']} • نمرې: ${r['score']}')),
+    ]),
+  );
+}
+
+class InventoryMovesScreen extends StatefulWidget {
+  const InventoryMovesScreen({super.key});
+  @override State<InventoryMovesScreen> createState()=>_InventoryMovesScreenState();
+}
+class _InventoryMovesScreenState extends State<InventoryMovesScreen>{
+  List<Map<String,Object?>> items=[],moves=[];int? itemId;String type='داخل';
+  final quantity=TextEditingController(),date=TextEditingController(text:DateTime.now().toIso8601String().substring(0,10)),receiver=TextEditingController(),doc=TextEditingController(),note=TextEditingController();
+  @override void initState(){super.initState();_load();}
+  @override void dispose(){quantity.dispose();date.dispose();receiver.dispose();doc.dispose();note.dispose();super.dispose();}
+  Future<void> _load()async{final d=SchoolDatabase.instance;final i=await d.rows('inventory',orderBy:'item_name ASC'),m=await d.rows('inventory_moves');if(mounted)setState((){items=i;moves=m;});}
+  Future<void> _save()async{final q=double.tryParse(quantity.text);if(itemId==null||q==null||q<=0)return;try{await SchoolDatabase.instance.recordInventoryMove(itemId!,type,q,date.text,receiver:receiver.text,documentNo:doc.text,note:note.text);quantity.clear();await _load();if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('د جنس حرکت ثبت شو')));}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('$e')));}}
+  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('د اجناسو ورود او مصرف')),body:ListView(padding:const EdgeInsets.all(12),children:[
+    if(items.isEmpty)const Text('لومړی د اجناسو برخه کې جنس ثبت کړئ.'),
+    DropdownButtonFormField<int>(initialValue:itemId,decoration:const InputDecoration(labelText:'جنس'),items:items.map((x)=>DropdownMenuItem(value:x['id'] as int,child:Text('${x['item_name']} — موجودي: ${x['quantity']} ${x['unit']}'))).toList(),onChanged:(v)=>setState(()=>itemId=v)),
+    DropdownButtonFormField<String>(initialValue:type,decoration:const InputDecoration(labelText:'حرکت'),items:const ['داخل','مصرف'].map((x)=>DropdownMenuItem(value:x,child:Text(x))).toList(),onChanged:(v)=>setState(()=>type=v??'داخل')),
+    TextField(controller:quantity,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'اندازه')),
+    TextField(controller:date,decoration:const InputDecoration(labelText:'نېټه YYYY-MM-DD')),
+    TextField(controller:receiver,decoration:const InputDecoration(labelText:'ترلاسه کوونکی / مصرفوونکی')),
+    TextField(controller:doc,decoration:const InputDecoration(labelText:'د سند شمېره')),
+    TextField(controller:note,decoration:const InputDecoration(labelText:'یادښت')),
+    const SizedBox(height:8),FilledButton.icon(onPressed:_save,icon:const Icon(Icons.save),label:const Text('حرکت ثبتول')),
+    const Divider(height:28),const Text('د ګدام اوسنی موجودي',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
+    for(final x in items)ListTile(title:Text('${x['item_name']}'),subtitle:Text('موجودي: ${x['quantity']} ${x['unit']}')),
+    const Divider(),const Text('وروستي حرکتونه',style:TextStyle(fontWeight:FontWeight.bold)),
+    for(final m in moves.take(20))ListTile(title:Text('${m['move_type']} — ${m['quantity']}'),subtitle:Text('جنس ID: ${m['item_id']} • ${m['move_date']} • ${m['receiver']??''}')),
+  ]));
+}
+
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
   @override State<ReportsScreen> createState() => _ReportsScreenState();
