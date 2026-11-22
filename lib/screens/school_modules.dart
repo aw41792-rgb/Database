@@ -137,12 +137,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     final db = SchoolDatabase.instance;
     final result = await db.getStudents();
     final saved = await db.attendanceForDate(date);
-    if (mounted) setState(() {
-      students = result;
-      chosen
-        ..clear()
-        ..addAll(saved);
-    });
+    if (mounted) {
+      setState(() {
+        students = result;
+        chosen
+          ..clear()
+          ..addAll(saved);
+      });
+    }
   }
   @override Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('ورځنۍ حاضري')),
@@ -311,10 +313,13 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
     final db=SchoolDatabase.instance;
     final t=await db.rows('teachers',orderBy:'name ASC');
     final saved=await db.staffAttendanceForDate(date);
-    if(mounted)setState((){
-      teachers=t;loading=false;
-      chosen..clear()..addAll(saved);
-    });
+    if (mounted) {
+      setState(() {
+        teachers = t;
+        loading = false;
+        chosen..clear()..addAll(saved);
+      });
+    }
   }
   Future<void> _save() async {
     for(final t in teachers){
