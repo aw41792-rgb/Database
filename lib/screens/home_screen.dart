@@ -6,7 +6,7 @@ import 'school_modules.dart';
 class HomeScreen extends StatefulWidget {const HomeScreen({super.key});@override State<HomeScreen> createState()=>_HomeScreenState();}
 class _HomeScreenState extends State<HomeScreen>{
  int students=0,teachers=0;@override void initState(){super.initState();_refresh();}
- Future<void> _refresh()async{final d=SchoolDatabase.instance;final s=await d.studentCount();final t=await d.count('teachers');if(mounted)setState(()=>{students=s,teachers=t});}
+ Future<void> _refresh()async{final d=SchoolDatabase.instance;final s=await d.studentCount();final t=await d.count('teachers');if (mounted) setState(() { students = s; teachers = t; });}
  void _open(Widget page)async{await Navigator.push(context,MaterialPageRoute(builder:(_)=>page));_refresh();}
  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('شلک منځنی ښوونځی'),actions:[IconButton(onPressed:()=>_open(const ReportsScreen()),icon:const Icon(Icons.bar_chart))]),body:ListView(padding:const EdgeInsets.all(14),children:[
  Card(color:const Color(0xFFE3F3EC),child:Padding(padding:const EdgeInsets.all(18),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('د ښوونځي د مدیریت سیستم',style:TextStyle(fontSize:21,fontWeight:FontWeight.bold)),const SizedBox(height:6),const Text('آف‌لاین اداره • ځايي ډیټابېس • د شلک منځنی ښوونځی'),const SizedBox(height:14),Wrap(spacing:22,children:[Text('زده‌کوونکي: $students',style:const TextStyle(fontWeight:FontWeight.bold)),Text('ښوونکي: $teachers',style:const TextStyle(fontWeight:FontWeight.bold))]) ]))),
