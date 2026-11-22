@@ -1,0 +1,47 @@
+name: Windows Desktop Setup
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - name: د کوډ ترلاسه کول
+        uses: actions/checkout@v4
+      - name: Flutter نصب کول
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: د Windows پروژه جوړول
+        shell: pwsh
+        run: flutter create --platforms=windows --org af.shalak.school .
+      - name: کتابتونونه ترلاسه کول
+        run: flutter pub get
+      - name: د کوډ تحلیل
+        run: flutter analyze
+      - name: ازموینې
+        run: flutter test
+      - name: Windows پروګرام جوړول
+        run: flutter build windows --release
+      - name: Inno Setup نصب کول
+        run: choco install innosetup --yes --no-progress
+      - name: د نصب فایل جوړول
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer\shulak_school.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Setup.exe ساتل
+        uses: actions/upload-artifact@v4
+        with:
+          name: shalak-school-windows-setup
+          path: dist/ShalakSchool-Setup.exe
+          if-no-files-found: error
