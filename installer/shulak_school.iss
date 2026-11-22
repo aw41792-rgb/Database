@@ -15,7 +15,7 @@ PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64
 
 [Languages]
-Name: "pashto"; MessagesFile: "compiler:Languages\English.isl"
+Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
