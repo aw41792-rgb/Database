@@ -134,15 +134,22 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   String date = DateTime.now().toIso8601String().substring(0, 10);
   @override void initState() { super.initState(); _load(); }
   Future<void> _load() async {
-    final result = await SchoolDatabase.instance.getStudents();
-    if (mounted) setState(() => students = result);
+    final db = SchoolDatabase.instance;
+    final result = await db.getStudents();
+    final saved = await db.attendanceForDate(date);
+    if (mounted) setState(() {
+      students = result;
+      chosen
+        ..clear()
+        ..addAll(saved);
+    });
   }
   @override Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('ورځنۍ حاضري')),
     body: Column(children: [
       Padding(
         padding: const EdgeInsets.all(12),
-        child: TextFormField(initialValue: date, decoration: const InputDecoration(labelText: 'نېټه (YYYY-MM-DD)'), onChanged: (v) => date = v),
+        child: TextFormField(initialValue: date, decoration: const InputDecoration(labelText: 'نېټه (YYYY-MM-DD)'), onChanged: (v) { date = v; _load(); }),
       ),
       Expanded(child: students.isEmpty
         ? const Center(child: Text('لومړی زده‌کوونکي ثبت کړئ'))
@@ -288,4 +295,91 @@ class _ReportsScreenState extends State<ReportsScreen> {
       ]),
     );
   }
+}
+
+class StaffAttendanceScreen extends StatefulWidget {
+  const StaffAttendanceScreen({super.key});
+  @override State<StaffAttendanceScreen> createState() => _StaffAttendanceScreenState();
+}
+class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
+  List<Map<String,Object?>> teachers=[];
+  final Map<int,String> chosen={};
+  String date=DateTime.now().toIso8601String().substring(0,10);
+  bool loading=true;
+  @override void initState(){super.initState();_load();}
+  Future<void> _load() async {
+    final db=SchoolDatabase.instance;
+    final t=await db.rows('teachers',orderBy:'name ASC');
+    final saved=await db.staffAttendanceForDate(date);
+    if(mounted)setState((){
+      teachers=t;loading=false;
+      chosen..clear()..addAll(saved);
+    });
+  }
+  Future<void> _save() async {
+    for(final t in teachers){
+      final id=t['id'] as int;
+      await SchoolDatabase.instance.recordStaffAttendance(id,date,chosen[id]??'حاضر');
+    }
+    if(!mounted)return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('د ښوونکو حاضري ثبت شوه')));
+  }
+  @override Widget build(BuildContext context)=>Scaffold(
+    appBar:AppBar(title:const Text('د ښوونکو حاضري')),
+    body:loading?const Center(child:CircularProgressIndicator()):Column(children:[
+      Padding(padding:const EdgeInsets.all(12),child:TextFormField(
+        initialValue:date,decoration:const InputDecoration(labelText:'نېټه (YYYY-MM-DD)'),
+        onChanged:(v){date=v;},onFieldSubmitted:(_)=>_load())),
+      Expanded(child:teachers.isEmpty?const Center(child:Text('لومړی ښوونکي ثبت کړئ')):ListView.builder(
+        itemCount:teachers.length,itemBuilder:(ctx,i){
+          final t=teachers[i],id=t['id'] as int;
+          return ListTile(title:Text('${t['name']}'),
+            subtitle:Text('${t['subject']??'مضمون نه دی ثبت'}'),
+            trailing:DropdownButton<String>(
+              value:chosen[id]??'حاضر',
+              items:const ['حاضر','غیر حاضر','رخصت','مریض'].map((v)=>DropdownMenuItem(value:v,child:Text(v))).toList(),
+              onChanged:(v)=>setState(()=>chosen[id]=v??'حاضر')));
+        })),
+      Padding(padding:const EdgeInsets.all(12),child:SizedBox(width:double.infinity,
+        child:FilledButton.icon(onPressed:_save,icon:const Icon(Icons.save),label:const Text('د ښوونکو حاضري ثبتول'))))
+    ]));
+}
+
+class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({super.key});
+  @override State<SettingsScreen> createState()=>_SettingsScreenState();
+}
+class _SettingsScreenState extends State<SettingsScreen>{
+  final school=TextEditingController(),year=TextEditingController();
+  bool loading=true;
+  @override void initState(){super.initState();_load();}
+  @override void dispose(){school.dispose();year.dispose();super.dispose();}
+  Future<void> _load()async{
+    final s=await SchoolDatabase.instance.getSettings();
+    school.text=s['school_name']??'شلک منځنی ښوونځی';
+    year.text=s['academic_year']??'۱۴۰۵';
+    if(mounted)setState(()=>loading=false);
+  }
+  Future<void> _save()async{
+    if(school.text.trim().isEmpty||year.text.trim().isEmpty)return;
+    await SchoolDatabase.instance.saveSetting('school_name',school.text.trim());
+    await SchoolDatabase.instance.saveSetting('academic_year',year.text.trim());
+    if(!mounted)return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تنظیمات خوندي شول')));
+  }
+  @override Widget build(BuildContext context)=>Scaffold(
+    appBar:AppBar(title:const Text('د ښوونځي تنظیمات')),
+    body:loading?const Center(child:CircularProgressIndicator()):ListView(padding:const EdgeInsets.all(16),children:[
+      const Icon(Icons.tune_rounded,size:48,color:Color(0xFF16845B)),
+      const SizedBox(height:12),
+      TextField(controller:school,decoration:const InputDecoration(labelText:'د ښوونځي نوم')),
+      const SizedBox(height:12),
+      TextField(controller:year,decoration:const InputDecoration(labelText:'تعلیمي کال')),
+      const SizedBox(height:16),
+      FilledButton.icon(onPressed:_save,icon:const Icon(Icons.save),label:const Text('تنظیمات خوندي کول')),
+      const SizedBox(height:20),
+      const Card(child:Padding(padding:EdgeInsets.all(14),child:Text(
+        'معلومات په همدې موبایل کې په محلي ډیټابیس کې ساتل کېږي. د اپلیکیشن له حذفولو مخکې د معلوماتو د بیک‌اپ جوړول اړین دي.',
+        style:TextStyle(height:1.5)))),
+    ]));
 }
