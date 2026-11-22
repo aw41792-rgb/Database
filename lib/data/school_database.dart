@@ -21,6 +21,27 @@ class SchoolDatabase {
             "ALTER TABLE students ADD COLUMN village TEXT","ALTER TABLE students ADD COLUMN guardian TEXT",
             "ALTER TABLE students ADD COLUMN guardian_phone TEXT","ALTER TABLE students ADD COLUMN status TEXT DEFAULT 'فعال'"
           ]) { try { await db.execute(sql); } catch (_) {} }
+          for (final sql in [
+            "ALTER TABLE teachers ADD COLUMN teacher_no TEXT",
+            "ALTER TABLE teachers ADD COLUMN grandfather_name TEXT",
+            "ALTER TABLE teachers ADD COLUMN qualification TEXT",
+            "ALTER TABLE teachers ADD COLUMN address TEXT",
+            "ALTER TABLE teachers ADD COLUMN start_date TEXT",
+            "ALTER TABLE teachers ADD COLUMN status TEXT DEFAULT 'فعال'",
+            "ALTER TABLE exams ADD COLUMN exam_type TEXT",
+            "ALTER TABLE exams ADD COLUMN grade INTEGER",
+            "ALTER TABLE exams ADD COLUMN exam_date TEXT",
+            "ALTER TABLE exams ADD COLUMN max_score REAL DEFAULT 100",
+            "ALTER TABLE inventory ADD COLUMN category TEXT",
+            "ALTER TABLE inventory ADD COLUMN entry_date TEXT",
+            "ALTER TABLE inventory ADD COLUMN document_no TEXT",
+            "ALTER TABLE inventory ADD COLUMN unit_price REAL DEFAULT 0",
+            "ALTER TABLE letters ADD COLUMN direction TEXT",
+            "ALTER TABLE letters ADD COLUMN sender TEXT",
+            "ALTER TABLE letters ADD COLUMN receiver TEXT",
+            "ALTER TABLE letters ADD COLUMN classification TEXT",
+            "ALTER TABLE letters ADD COLUMN status TEXT"
+          ]) { try { await db.execute(sql); } catch (_) {} }
           await _createExtraTables(db);
         }
       });
