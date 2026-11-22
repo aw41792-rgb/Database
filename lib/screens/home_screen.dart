@@ -269,7 +269,7 @@ class _HomeScreenState extends State<HomeScreen> {
         colors: [Color(0xFF126B50), Color(0xFF168A82), Color(0xFF237FA8)],
       ),
       borderRadius: BorderRadius.circular(24),
-      boxShadow: [BoxShadow(color: const Color(0xFF126B50).withOpacity(.20), blurRadius: 18, offset: const Offset(0, 8))],
+      boxShadow: [BoxShadow(color: const Color(0xFF126B50).withValues(alpha: .20), blurRadius: 18, offset: const Offset(0, 8))],
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -286,7 +286,7 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 17),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(color: Colors.white.withOpacity(.15), borderRadius: BorderRadius.circular(30)),
+          decoration: BoxDecoration(color: Colors.white.withValues(alpha: .15), borderRadius: BorderRadius.circular(30)),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             const Icon(Icons.calendar_today_rounded, size: 15, color: Colors.white),
             const SizedBox(width: 8),
@@ -318,7 +318,7 @@ class _HomeScreenState extends State<HomeScreen> {
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17), side: const BorderSide(color: Color(0xFFE6EDEF))),
     child: ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-      leading: Container(width: 46, height: 46, decoration: BoxDecoration(color: color.withOpacity(.11), borderRadius: BorderRadius.circular(14)), child: Icon(icon, color: color, size: 25)),
+      leading: Container(width: 46, height: 46, decoration: BoxDecoration(color: color.withValues(alpha: .11), borderRadius: BorderRadius.circular(14)), child: Icon(icon, color: color, size: 25)),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xFF233D40))),
       subtitle: Padding(padding: const EdgeInsets.only(top: 4), child: Text(subtitle, style: const TextStyle(fontSize: 12, height: 1.4))),
       trailing: const Icon(Icons.chevron_left_rounded, color: Color(0xFF789096)),
