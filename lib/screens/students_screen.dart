@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../data/school_database.dart';
 
 class StudentsScreen extends StatefulWidget {
@@ -29,8 +29,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
         TextFormField(controller: basis, decoration: const InputDecoration(labelText: 'اساس نمبر'), validator: _required),
         const SizedBox(height: 10), TextFormField(controller: name, decoration: const InputDecoration(labelText: 'د زده‌کوونکي نوم'), validator: _required),
         const SizedBox(height: 10), TextFormField(controller: father, decoration: const InputDecoration(labelText: 'د پلار نوم'), validator: _required),
-        const SizedBox(height: 10), DropdownButtonFormField<int>(value: grade, decoration: const InputDecoration(labelText: 'ټولګی'), items: List.generate(12, (i) => DropdownMenuItem(value: i + 1, child: Text('${i + 1} ټولګی'))), onChanged: (v) => setDialogState(() => grade = v ?? 1)),
-        const SizedBox(height: 10), DropdownButtonFormField<String>(value: shift, decoration: const InputDecoration(labelText: 'وخت'), items: const ['سهار', 'ماسپښین', 'ماښام'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setDialogState(() => shift = v ?? 'سهار')),
+        const SizedBox(height: 10), DropdownButtonFormField<int>(initialValue: grade, decoration: const InputDecoration(labelText: 'ټولګی'), items: List.generate(12, (i) => DropdownMenuItem(value: i + 1, child: Text('${i + 1} ټولګی'))), onChanged: (v) => setDialogState(() => grade = v ?? 1)),
+        const SizedBox(height: 10), DropdownButtonFormField<String>(initialValue: shift, decoration: const InputDecoration(labelText: 'وخت'), items: const ['سهار', 'ماسپښین', 'ماښام'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setDialogState(() => shift = v ?? 'سهار')),
       ]))),
       actions: [TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('بندول')), FilledButton(onPressed: () { if (formKey.currentState!.validate()) Navigator.pop(dialogContext, true); }, child: const Text('ثبتول'))],
     )));
