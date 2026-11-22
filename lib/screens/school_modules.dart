@@ -171,7 +171,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               final id = student['id'] as int;
               await SchoolDatabase.instance.recordAttendance(id, date, chosen[id] ?? 'حاضر');
             }
-            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('حاضري ثبت شوه')));
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('حاضري ثبت شوه')));
           },
           icon: const Icon(Icons.save), label: const Text('د ټولو حاضري ثبتول'),
         ),
