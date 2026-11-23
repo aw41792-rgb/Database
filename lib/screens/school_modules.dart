@@ -1,4 +1,6 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:io';
 import '../data/school_database.dart';
 
 class ModuleField {
@@ -151,7 +153,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     body: Column(children: [
       Padding(
         padding: const EdgeInsets.all(12),
-        child: TextFormField(initialValue: date, decoration: const InputDecoration(labelText: 'نېټه (YYYY-MM-DD)'), onChanged: (v) { date = v; _load(); }),
+        child: TextFormField(
+          initialValue: date,
+          decoration: const InputDecoration(labelText: 'نېټه (YYYY-MM-DD)'),
+          onChanged: (v) { date = v; },
+          onFieldSubmitted: (_) => _load(),
+        ),
       ),
       Expanded(child: students.isEmpty
         ? const Center(child: Text('لومړی زده‌کوونکي ثبت کړئ'))
@@ -164,7 +171,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 title: Text('${student['name']}'),
                 subtitle: Text('${student['basis_number']} • ${student['grade']} ټولګی'),
                 trailing: DropdownButton<String>(
-                  value: chosen[id] ?? 'حاضر',
+                  value: chosen[id],
+                  hint: const Text('وټاکئ'),
                   items: const ['حاضر', 'غیر حاضر', 'رخصت', 'مریض'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
                   onChanged: (v) => setState(() { chosen[id] = v ?? 'حاضر'; }),
                 ),
@@ -176,9 +184,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         padding: const EdgeInsets.all(12),
         child: FilledButton.icon(
           onPressed: () async {
+            if (date.trim().isEmpty || students.any((student) => !chosen.containsKey(student['id'] as int))) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('نېټه او د ټولو زده‌کوونکو حاضري وټاکئ؛ ناتکمیل معلومات نه ثبتېږي.')));
+              return;
+            }
             for (final student in students) {
               final id = student['id'] as int;
-              await SchoolDatabase.instance.recordAttendance(id, date, chosen[id] ?? 'حاضر');
+              await SchoolDatabase.instance.recordAttendance(id, date.trim(), chosen[id]!);
             }
             if (!context.mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('حاضري ثبت شوه')));
@@ -207,10 +219,21 @@ class _ResultsScreenState extends State<ResultsScreen> {
     if(mounted)setState((){students=s;exams=e;results=r;});
   }
   Future<void> _save() async {
-    if(studentId==null||examId==null||subject.text.trim().isEmpty||num.tryParse(score.text)==null)return;
-    await SchoolDatabase.instance.insert('results',{'student_id':studentId,'exam_id':examId,'subject':subject.text.trim(),'score':num.parse(score.text)});
-    subject.clear();score.clear();await _load();
-    if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('نمره ثبت شوه')));
+    final parsed = double.tryParse(score.text.trim());
+    if(studentId==null || examId==null || subject.text.trim().isEmpty || parsed==null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('زده‌کوونکی، ازموینه، مضمون او سمه نمره وټاکئ')));
+      return;
+    }
+    try {
+      await SchoolDatabase.instance.saveResult(
+        studentId: studentId!, examId: examId!,
+        subject: subject.text, score: parsed,
+      );
+      subject.clear(); score.clear(); await _load();
+      if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('نمره په بریالیتوب ثبت شوه')));
+    } catch(e) {
+      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('نمره ثبت نه شوه: $e')));
+    }
   }
   @override Widget build(BuildContext context)=>Scaffold(
     appBar:AppBar(title:const Text('د ازموینو پایلې او نمرې')),
@@ -222,7 +245,10 @@ class _ResultsScreenState extends State<ResultsScreen> {
       const SizedBox(height:8),TextField(controller:score,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'ترلاسه شوې نمرې')),
       const SizedBox(height:8),FilledButton.icon(onPressed:_save,icon:const Icon(Icons.save),label:const Text('نمرې ثبتول')),
       const Divider(height:28),const Text('ثبت شوې پایلې',style:TextStyle(fontWeight:FontWeight.bold,fontSize:18)),
-      for(final r in results) ListTile(title:Text('مضمون: ${r['subject']}'),subtitle:Text('زده‌کوونکی ID: ${r['student_id']} • ازموینه ID: ${r['exam_id']} • نمرې: ${r['score']}')),
+      for(final r in results) ListTile(
+        title:Text('مضمون: ${r['subject']}'),
+        subtitle:Text('زده‌کوونکی: ${students.where((s)=>s['id']==r['student_id']).map((s)=>s['name']).firstOrNull ?? 'ناڅرګند'} • ازموینه: ${exams.where((e)=>e['id']==r['exam_id']).map((e)=>e['title']).firstOrNull ?? 'ناڅرګنده'} • نمرې: ${r['score']}'),
+      ),
     ]),
   );
 }
@@ -262,13 +288,15 @@ class ReportsScreen extends StatefulWidget {
 class _ReportsScreenState extends State<ReportsScreen> {
   int students = 0, teachers = 0, exams = 0, letters = 0, inventory = 0;
   Map<String, int> grades = {}, attendance = {};
+  Map<String, double> finance = {};
   @override void initState() { super.initState(); _load(); }
   Future<void> _load() async {
     final db = SchoolDatabase.instance;
     final s = await db.studentCount(), t = await db.count('teachers'), e = await db.count('exams');
     final l = await db.count('letters'), inv = await db.count('inventory');
     final g = await db.gradeCounts(), a = await db.attendanceSummary();
-    if (mounted) setState(() { students=s; teachers=t; exams=e; letters=l; inventory=inv; grades=g; attendance=a; });
+    final f = await db.financeSummary();
+    if (mounted) setState(() { students=s; teachers=t; exams=e; letters=l; inventory=inv; grades=g; attendance=a; finance=f; });
   }
   @override Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('احصائیه او ګرافونه')),
@@ -276,6 +304,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
       Wrap(spacing: 8, runSpacing: 8, children: [
         _stat('زده‌کوونکي', students), _stat('ښوونکي', teachers), _stat('ازموینې', exams),
         _stat('مکتوبونه', letters), _stat('د اجناسو ډولونه', inventory),
+      ]),
+      const SizedBox(height: 20),
+      const Text('مالي لنډیز', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+      Wrap(spacing: 8, runSpacing: 8, children: [
+        _moneyStat('ټول عواید', finance['عواید'] ?? 0),
+        _moneyStat('ټول لګښتونه', finance['لګښت'] ?? 0),
+        _moneyStat('پاتې پیسې', finance['پاتې'] ?? 0),
       ]),
       const SizedBox(height: 20),
       const Text('د ټولګیو له مخې زده‌کوونکي', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -287,6 +322,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     ]),
   );
   Widget _stat(String label, int value) => SizedBox(width: 145, child: Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(children: [Text('$value', style: const TextStyle(fontSize: 25, fontWeight: FontWeight.bold)), Text(label)]))));
+  Widget _moneyStat(String label, double value) => SizedBox(width: 145, child: Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(children: [Text(value.toStringAsFixed(2), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), Text(label)]))));
   Widget _bar(String label, int value, int total) {
     final ratio = total == 0 ? 0.0 : value / total;
     return Padding(
@@ -322,9 +358,13 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
     }
   }
   Future<void> _save() async {
+    if(date.trim().isEmpty || teachers.any((teacher)=>!chosen.containsKey(teacher['id'] as int))){
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('نېټه او د ټولو ښوونکو حاضري وټاکئ؛ ناتکمیل معلومات نه ثبتېږي.')));
+      return;
+    }
     for(final t in teachers){
       final id=t['id'] as int;
-      await SchoolDatabase.instance.recordStaffAttendance(id,date,chosen[id]??'حاضر');
+      await SchoolDatabase.instance.recordStaffAttendance(id,date.trim(),chosen[id]!);
     }
     if(!mounted)return;
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('د ښوونکو حاضري ثبت شوه')));
@@ -341,7 +381,8 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
           return ListTile(title:Text('${t['name']}'),
             subtitle:Text('${t['subject']??'مضمون نه دی ثبت'}'),
             trailing:DropdownButton<String>(
-              value:chosen[id]??'حاضر',
+              value:chosen[id],
+              hint:const Text('وټاکئ'),
               items:const ['حاضر','غیر حاضر','رخصت','مریض'].map((v)=>DropdownMenuItem(value:v,child:Text(v))).toList(),
               onChanged:(v)=>setState(()=>chosen[id]=v??'حاضر')));
         })),
@@ -372,6 +413,62 @@ class _SettingsScreenState extends State<SettingsScreen>{
     if(!mounted)return;
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تنظیمات خوندي شول')));
   }
+
+  Future<void> _createBackup() async {
+    try {
+      final source = await SchoolDatabase.instance.prepareBackupFile();
+      final bytes = await source.readAsBytes();
+      final now = DateTime.now();
+      final stamp = '${now.year}${now.month.toString().padLeft(2,'0')}${now.day.toString().padLeft(2,'0')}_${now.hour.toString().padLeft(2,'0')}${now.minute.toString().padLeft(2,'0')}';
+      final path = await FilePicker.platform.saveFile(
+        dialogTitle: 'د ښوونځي د معلوماتو بیک‌اپ خوندي کړئ',
+        fileName: 'Shalak_School_Backup_$stamp.db',
+        type: FileType.custom,
+        allowedExtensions: ['db'],
+        bytes: bytes,
+      );
+      if (!mounted) return;
+      if (path != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('بیک‌اپ په بریالیتوب جوړ شو')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('بیک‌اپ جوړ نه شو: $e')));
+      }
+    }
+  }
+
+  Future<void> _restoreBackup() async {
+    final choice = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('د معلوماتو بېرته راګرځول'),
+        content: const Text('د بیک‌اپ په راګرځولو سره اوسني معلومات د بیک‌اپ له معلوماتو سره بدلېږي. مخکې له دې د اوسنیو معلوماتو بیک‌اپ جوړ کړئ. دوام ورکوئ؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('نه')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('هو، دوام ورکړه')),
+        ],
+      ),
+    );
+    if (choice != true) return;
+    try {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.custom, allowedExtensions: ['db'], withData: false);
+      if (picked == null || picked.files.single.path == null) return;
+      await SchoolDatabase.instance.restoreFromBackup(File(picked.files.single.path!));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('معلومات په بریالیتوب بېرته را وګرځېدل')));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('معلومات بېرته را و نه ګرځېدل: $e')));
+      }
+    }
+  }
+
   @override Widget build(BuildContext context)=>Scaffold(
     appBar:AppBar(title:const Text('د ښوونځي تنظیمات')),
     body:loading?const Center(child:CircularProgressIndicator()):ListView(padding:const EdgeInsets.all(16),children:[
@@ -382,6 +479,13 @@ class _SettingsScreenState extends State<SettingsScreen>{
       TextField(controller:year,decoration:const InputDecoration(labelText:'تعلیمي کال')),
       const SizedBox(height:16),
       FilledButton.icon(onPressed:_save,icon:const Icon(Icons.save),label:const Text('تنظیمات خوندي کول')),
+      const SizedBox(height:20),
+      const Divider(),
+      const Text('د معلوماتو ساتنه',style:TextStyle(fontSize:18,fontWeight:FontWeight.w800)),
+      const SizedBox(height:10),
+      FilledButton.icon(onPressed:_createBackup,icon:const Icon(Icons.backup_rounded),label:const Text('بیک‌اپ جوړول او خوندي کول')),
+      const SizedBox(height:8),
+      OutlinedButton.icon(onPressed:_restoreBackup,icon:const Icon(Icons.settings_backup_restore_rounded),label:const Text('له بیک‌اپ څخه معلومات راګرځول')),
       const SizedBox(height:20),
       const Card(child:Padding(padding:EdgeInsets.all(14),child:Text(
         'معلومات په همدې موبایل کې په محلي ډیټابیس کې ساتل کېږي. د اپلیکیشن له حذفولو مخکې د معلوماتو د بیک‌اپ جوړول اړین دي.',

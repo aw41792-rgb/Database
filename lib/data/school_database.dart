@@ -41,11 +41,12 @@ class SchoolDatabase {
     final root = await getDatabasesPath();
     _database = await openDatabase(
       p.join(root, 'shalak_school.db'),
-      version: 3,
+      version: 4,
       onCreate: (db, version) async => _createSchema(db),
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await _upgradeToV2(db);
         if (oldVersion < 3) await _createExtraTables(db);
+        if (oldVersion < 4) await _upgradeToV4(db);
       },
     );
     return _database!;
@@ -93,6 +94,61 @@ class SchoolDatabase {
     await _createExtraTables(db);
   }
 
+  Future<void> _upgradeToV4(Database db) async {
+    // Database-level guards protect records even when a screen or import path
+    // accidentally bypasses form validation.
+    final guards = <String>[
+      """CREATE TRIGGER IF NOT EXISTS trg_students_grade_insert
+      BEFORE INSERT ON students WHEN NEW.grade < 1 OR NEW.grade > 12
+      BEGIN SELECT RAISE(ABORT, 'ټولګی باید له ۱ تر ۱۲ پورې وي'); END""",
+      """CREATE TRIGGER IF NOT EXISTS trg_students_grade_update
+      BEFORE UPDATE OF grade ON students WHEN NEW.grade < 1 OR NEW.grade > 12
+      BEGIN SELECT RAISE(ABORT, 'ټولګی باید له ۱ تر ۱۲ پورې وي'); END""",
+      """CREATE TRIGGER IF NOT EXISTS trg_attendance_guard_insert
+      BEFORE INSERT ON attendance
+      WHEN NEW.status NOT IN ('حاضر','غیر حاضر','رخصت','مریض')
+        OR NOT EXISTS(SELECT 1 FROM students WHERE id=NEW.student_id)
+        OR length(trim(NEW.attendance_date))=0
+      BEGIN SELECT RAISE(ABORT, 'د زده‌کوونکي د حاضري معلومات ناسم دي'); END""",
+      """CREATE TRIGGER IF NOT EXISTS trg_staff_attendance_guard_insert
+      BEFORE INSERT ON staff_attendance
+      WHEN NEW.status NOT IN ('حاضر','غیر حاضر','رخصت','مریض')
+        OR NOT EXISTS(SELECT 1 FROM teachers WHERE id=NEW.teacher_id)
+        OR length(trim(NEW.attendance_date))=0
+      BEGIN SELECT RAISE(ABORT, 'د کارکوونکي د حاضري معلومات ناسم دي'); END""",
+      """CREATE TRIGGER IF NOT EXISTS trg_results_guard_insert
+      BEFORE INSERT ON results
+      WHEN NEW.score < 0
+        OR NOT EXISTS(SELECT 1 FROM students WHERE id=NEW.student_id)
+        OR NOT EXISTS(SELECT 1 FROM exams WHERE id=NEW.exam_id)
+        OR NEW.score > COALESCE((SELECT max_score FROM exams WHERE id=NEW.exam_id),100)
+      BEGIN SELECT RAISE(ABORT, 'د ازموینې نمرې یا اړوند معلومات ناسم دي'); END""",
+      """CREATE TRIGGER IF NOT EXISTS trg_inventory_moves_guard_insert
+      BEFORE INSERT ON inventory_moves
+      WHEN NEW.quantity <= 0 OR NEW.move_type NOT IN ('داخل','مصرف')
+        OR NOT EXISTS(SELECT 1 FROM inventory WHERE id=NEW.item_id)
+        OR length(trim(NEW.move_date))=0
+      BEGIN SELECT RAISE(ABORT, 'د جنس د حرکت معلومات ناسم دي'); END""",
+      """CREATE TRIGGER IF NOT EXISTS trg_finance_guard_insert
+      BEFORE INSERT ON finance
+      WHEN NEW.amount <= 0
+        OR NEW.transaction_type NOT IN ('عواید','عاید','داخل','لګښت','مصرف','خارج')
+        OR length(trim(NEW.transaction_date))=0
+      BEGIN SELECT RAISE(ABORT, 'د مالي معاملې معلومات ناسم دي'); END""",
+      """CREATE TRIGGER IF NOT EXISTS trg_student_delete_guard
+      BEFORE DELETE ON students
+      WHEN EXISTS(SELECT 1 FROM attendance WHERE student_id=OLD.id)
+        OR EXISTS(SELECT 1 FROM results WHERE student_id=OLD.id)
+        OR EXISTS(SELECT 1 FROM student_transfers WHERE student_id=OLD.id)
+      BEGIN SELECT RAISE(ABORT, 'دا زده‌کوونکی ثبت شوی تاریخ لري؛ لومړی یې غیرفعال کړئ'); END""",
+      """CREATE TRIGGER IF NOT EXISTS trg_teacher_delete_guard
+      BEFORE DELETE ON teachers
+      WHEN EXISTS(SELECT 1 FROM staff_attendance WHERE teacher_id=OLD.id)
+      BEGIN SELECT RAISE(ABORT, 'دا ښوونکی د حاضري تاریخ لري؛ لومړی یې غیرفعال کړئ'); END""",
+    ];
+    for (final sql in guards) { await db.execute(sql); }
+  }
+
   Future<void> _createSchema(Database db) async {
     await db.execute("""CREATE TABLE students(
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -131,6 +187,7 @@ class SchoolDatabase {
       status TEXT DEFAULT 'فعال'
     )""");
     await _createExtraTables(db);
+    await _upgradeToV4(db);
     await db.insert('settings', {'key':'school_name','value':'شلک منځنی ښوونځی'});
     await db.insert('settings', {'key':'academic_year','value':'۱۴۰۵'});
   }
@@ -202,6 +259,13 @@ class SchoolDatabase {
     String? district, String? village, String? guardian,
     String? guardianPhone, String status='فعال',
   }) async {
+    if (basisNumber.trim().isEmpty || name.trim().isEmpty || fatherName.trim().isEmpty) {
+      throw ArgumentError('اساس نمبر، نوم او د پلار نوم اړین دي');
+    }
+    if (grade < 1 || grade > 12 || (admissionGrade != null && (admissionGrade < 1 || admissionGrade > 12))) {
+      throw ArgumentError('ټولګی باید له ۱ تر ۱۲ پورې وي');
+    }
+    if (!{'سهار','ماسپښين','ماښام'}.contains(shift)) throw ArgumentError('د زده‌کړې وخت ناسم دی');
     return (await database).insert('students', {
       'basis_number':basisNumber.trim(),'name':name.trim(),
       'father_name':fatherName.trim(),'grandfather_name':grandfatherName,
@@ -275,24 +339,78 @@ class SchoolDatabase {
       columns:['student_id','status'],where:'attendance_date=?',whereArgs:[date]);
     return {for(final x in r) x['student_id'] as int:x['status'] as String};
   }
-  Future<void> recordAttendance(int studentId,String date,String status) async =>
-      (await database).insert('attendance',{
-        'student_id':studentId,'attendance_date':date,'status':status,
-      },conflictAlgorithm:ConflictAlgorithm.replace);
+  Future<void> recordAttendance(int studentId,String date,String status) async {
+    const allowed = {'حاضر','غیر حاضر','رخصت','مریض'};
+    if (date.trim().isEmpty) throw ArgumentError('د حاضري نېټه اړینه ده');
+    if (!allowed.contains(status)) throw ArgumentError('د حاضري حالت ناسم دی');
+    final db = await database;
+    final student = await db.query('students', columns:['id'], where:'id=?', whereArgs:[studentId], limit:1);
+    if (student.isEmpty) throw ArgumentError('زده‌کوونکی ونه موندل شو');
+    await db.insert('attendance',{
+      'student_id':studentId,'attendance_date':date.trim(),'status':status,
+    },conflictAlgorithm:ConflictAlgorithm.replace);
+  }
+
+  Future<void> saveResult({required int studentId, required int examId, required String subject, required double score}) async {
+    final db = await database;
+    final exam = await db.query('exams', columns: ['max_score'], where: 'id=?', whereArgs: [examId], limit: 1);
+    if (exam.isEmpty) throw Exception('ازموینه ونه موندل شوه');
+    final maxScore = (exam.first['max_score'] as num?)?.toDouble() ?? 100;
+    if (score < 0 || score > maxScore) {
+      throw ArgumentError('نمرې باید له صفر څخه تر $maxScore پورې وي');
+    }
+    final student = await db.query('students', columns: ['id'], where: 'id=?', whereArgs: [studentId], limit: 1);
+    if (student.isEmpty) throw Exception('زده‌کوونکی ونه موندل شو');
+    if (subject.trim().isEmpty) throw ArgumentError('د مضمون نوم اړین دی');
+    await db.insert('results', {
+      'student_id': studentId,
+      'exam_id': examId,
+      'subject': subject.trim(),
+      'score': score,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<Map<String,double>> financeSummary() async {
+    final rows = await (await database).rawQuery(
+      "SELECT transaction_type, COALESCE(SUM(amount),0) AS total FROM finance GROUP BY transaction_type");
+    double income = 0, expense = 0;
+    for (final row in rows) {
+      final amount = (row['total'] as num).toDouble();
+      final type = '${row['transaction_type']}';
+      if (type == 'عواید' || type == 'عاید' || type == 'داخل') income += amount;
+      if (type == 'لګښت' || type == 'مصرف' || type == 'خارج') expense += amount;
+    }
+    return {'عواید': income, 'لګښت': expense, 'پاتې': income - expense};
+  }
+
+  Future<Map<String,int>> attendanceTotals() async {
+    final rows = await (await database).rawQuery(
+      "SELECT status, COUNT(*) AS total FROM attendance GROUP BY status");
+    return {for (final row in rows) '${row['status']}': (row['total'] as num).toInt()};
+  }
 
   Future<Map<int,String>> staffAttendanceForDate(String date) async {
     final r=await (await database).query('staff_attendance',
       columns:['teacher_id','status'],where:'attendance_date=?',whereArgs:[date]);
     return {for(final x in r) x['teacher_id'] as int:x['status'] as String};
   }
-  Future<void> recordStaffAttendance(int teacherId,String date,String status) async =>
-      (await database).insert('staff_attendance',{
-        'teacher_id':teacherId,'attendance_date':date,'status':status,
-      },conflictAlgorithm:ConflictAlgorithm.replace);
+  Future<void> recordStaffAttendance(int teacherId,String date,String status) async {
+    const allowed = {'حاضر','غیر حاضر','رخصت','مریض'};
+    if (date.trim().isEmpty) throw ArgumentError('د حاضري نېټه اړینه ده');
+    if (!allowed.contains(status)) throw ArgumentError('د حاضري حالت ناسم دی');
+    final db = await database;
+    final teacher = await db.query('teachers', columns:['id'], where:'id=?', whereArgs:[teacherId], limit:1);
+    if (teacher.isEmpty) throw ArgumentError('ښوونکی ونه موندل شو');
+    await db.insert('staff_attendance',{
+      'teacher_id':teacherId,'attendance_date':date.trim(),'status':status,
+    },conflictAlgorithm:ConflictAlgorithm.replace);
+  }
 
   Future<void> recordInventoryMove(int itemId,String type,double quantity,String date,
       {String? receiver,String? documentNo,String? note}) async {
     if(quantity<=0) throw ArgumentError('اندازه باید له صفر څخه زیاته وي');
+    if(!{'داخل','مصرف'}.contains(type)) throw ArgumentError('د جنس د حرکت ډول ناسم دی');
+    if(date.trim().isEmpty) throw ArgumentError('د جنس د حرکت نېټه اړینه ده');
     final db=await database;
     await db.transaction((txn) async {
       final found=await txn.query('inventory',where:'id=?',whereArgs:[itemId],limit:1);
@@ -347,6 +465,69 @@ class SchoolDatabase {
       results.add({'type':'جنس','title':'${r['item_name']}','subtitle':'ډول: ${r['category']??'—'} • موجودي: ${r['quantity']} ${r['unit']}','id':r['id']});
     }
     return results;
+  }
+
+
+  Future<File> prepareBackupFile() async {
+    final db = await database;
+    await db.execute('PRAGMA wal_checkpoint(FULL)');
+    final root = await getDatabasesPath();
+    final file = File(p.join(root, 'shalak_school.db'));
+    if (!await file.exists() || await file.length() == 0) {
+      throw Exception('د معلوماتو ډیټابېس ونه موندل شو');
+    }
+    return file;
+  }
+
+  Future<void> restoreFromBackup(File source) async {
+    if (!await source.exists() || await source.length() < 100) {
+      throw ArgumentError('د بیک‌اپ فایل ناسم یا تش دی');
+    }
+    final root = await getDatabasesPath();
+    final targetPath = p.join(root, 'shalak_school.db');
+    final tempPath = p.join(root, 'shalak_school_restore_check.db');
+    final tempFile = File(tempPath);
+    if (await tempFile.exists()) await tempFile.delete();
+    await source.copy(tempPath);
+
+    Database? checkDb;
+    try {
+      checkDb = await openDatabase(tempPath, readOnly: true);
+      final integrity = await checkDb.rawQuery('PRAGMA integrity_check');
+      if (integrity.isEmpty || integrity.first.values.first != 'ok') {
+        throw ArgumentError('د بیک‌اپ ډیټابېس روغ نه دی');
+      }
+      final tables = await checkDb.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table'");
+      final names = tables.map((row) => row['name']).whereType<String>().toSet();
+      if (!names.containsAll({'students', 'teachers', 'settings'})) {
+        throw ArgumentError('دا د ښوونځي د سیستم بیک‌اپ نه دی');
+      }
+    } finally {
+      await checkDb?.close();
+    }
+
+    final current = _database;
+    if (current != null) {
+      await current.execute('PRAGMA wal_checkpoint(FULL)');
+      await current.close();
+    }
+    _database = null;
+    _databaseOpening = null;
+
+    final target = File(targetPath);
+    if (await target.exists()) {
+      final safetyPath = p.join(root,
+        'shalak_school_before_restore_${DateTime.now().millisecondsSinceEpoch}.db');
+      await target.copy(safetyPath);
+    }
+    final wal = File('$targetPath-wal');
+    final shm = File('$targetPath-shm');
+    if (await wal.exists()) await wal.delete();
+    if (await shm.exists()) await shm.delete();
+    await tempFile.copy(targetPath);
+    await tempFile.delete();
+    await database;
   }
 
   Future<Map<String,String>> getSettings() async {
