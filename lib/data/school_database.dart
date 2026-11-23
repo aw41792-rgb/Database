@@ -41,11 +41,12 @@ class SchoolDatabase {
     final root = await getDatabasesPath();
     _database = await openDatabase(
       p.join(root, 'shalak_school.db'),
-      version: 3,
+      version: 4,
       onCreate: (db, version) async => _createSchema(db),
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await _upgradeToV2(db);
         if (oldVersion < 3) await _createExtraTables(db);
+        if (oldVersion < 4) await _upgradeToV4(db);
       },
     );
     return _database!;
@@ -91,6 +92,61 @@ class SchoolDatabase {
       try { await db.execute(sql); } catch (_) { /* column already exists */ }
     }
     await _createExtraTables(db);
+  }
+
+  Future<void> _upgradeToV4(Database db) async {
+    // Database-level guards protect records even when a screen or import path
+    // accidentally bypasses form validation.
+    final guards = <String>[
+      """CREATE TRIGGER IF NOT EXISTS trg_students_grade_insert
+      BEFORE INSERT ON students WHEN NEW.grade < 1 OR NEW.grade > 12
+      BEGIN SELECT RAISE(ABORT, 'ټولګی باید له ۱ تر ۱۲ پورې وي'); END""",
+      """CREATE TRIGGER IF NOT EXISTS trg_students_grade_update
+      BEFORE UPDATE OF grade ON students WHEN NEW.grade < 1 OR NEW.grade > 12
+      BEGIN SELECT RAISE(ABORT, 'ټولګی باید له ۱ تر ۱۲ پورې وي'); END""",
+      """CREATE TRIGGER IF NOT EXISTS trg_attendance_guard_insert
+      BEFORE INSERT ON attendance
+      WHEN NEW.status NOT IN ('حاضر','غیر حاضر','رخصت','مریض')
+        OR NOT EXISTS(SELECT 1 FROM students WHERE id=NEW.student_id)
+        OR length(trim(NEW.attendance_date))=0
+      BEGIN SELECT RAISE(ABORT, 'د زده‌کوونکي د حاضري معلومات ناسم دي'); END""",
+      """CREATE TRIGGER IF NOT EXISTS trg_staff_attendance_guard_insert
+      BEFORE INSERT ON staff_attendance
+      WHEN NEW.status NOT IN ('حاضر','غیر حاضر','رخصت','مریض')
+        OR NOT EXISTS(SELECT 1 FROM teachers WHERE id=NEW.teacher_id)
+        OR length(trim(NEW.attendance_date))=0
+      BEGIN SELECT RAISE(ABORT, 'د کارکوونکي د حاضري معلومات ناسم دي'); END""",
+      """CREATE TRIGGER IF NOT EXISTS trg_results_guard_insert
+      BEFORE INSERT ON results
+      WHEN NEW.score < 0
+        OR NOT EXISTS(SELECT 1 FROM students WHERE id=NEW.student_id)
+        OR NOT EXISTS(SELECT 1 FROM exams WHERE id=NEW.exam_id)
+        OR NEW.score > COALESCE((SELECT max_score FROM exams WHERE id=NEW.exam_id),100)
+      BEGIN SELECT RAISE(ABORT, 'د ازموینې نمرې یا اړوند معلومات ناسم دي'); END""",
+      """CREATE TRIGGER IF NOT EXISTS trg_inventory_moves_guard_insert
+      BEFORE INSERT ON inventory_moves
+      WHEN NEW.quantity <= 0 OR NEW.move_type NOT IN ('داخل','مصرف')
+        OR NOT EXISTS(SELECT 1 FROM inventory WHERE id=NEW.item_id)
+        OR length(trim(NEW.move_date))=0
+      BEGIN SELECT RAISE(ABORT, 'د جنس د حرکت معلومات ناسم دي'); END""",
+      """CREATE TRIGGER IF NOT EXISTS trg_finance_guard_insert
+      BEFORE INSERT ON finance
+      WHEN NEW.amount <= 0
+        OR NEW.transaction_type NOT IN ('عواید','عاید','داخل','لګښت','مصرف','خارج')
+        OR length(trim(NEW.transaction_date))=0
+      BEGIN SELECT RAISE(ABORT, 'د مالي معاملې معلومات ناسم دي'); END""",
+      """CREATE TRIGGER IF NOT EXISTS trg_student_delete_guard
+      BEFORE DELETE ON students
+      WHEN EXISTS(SELECT 1 FROM attendance WHERE student_id=OLD.id)
+        OR EXISTS(SELECT 1 FROM results WHERE student_id=OLD.id)
+        OR EXISTS(SELECT 1 FROM student_transfers WHERE student_id=OLD.id)
+      BEGIN SELECT RAISE(ABORT, 'دا زده‌کوونکی ثبت شوی تاریخ لري؛ لومړی یې غیرفعال کړئ'); END""",
+      """CREATE TRIGGER IF NOT EXISTS trg_teacher_delete_guard
+      BEFORE DELETE ON teachers
+      WHEN EXISTS(SELECT 1 FROM staff_attendance WHERE teacher_id=OLD.id)
+      BEGIN SELECT RAISE(ABORT, 'دا ښوونکی د حاضري تاریخ لري؛ لومړی یې غیرفعال کړئ'); END""",
+    ];
+    for (final sql in guards) { await db.execute(sql); }
   }
 
   Future<void> _createSchema(Database db) async {
