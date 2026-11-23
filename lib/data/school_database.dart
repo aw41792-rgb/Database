@@ -187,6 +187,7 @@ class SchoolDatabase {
       status TEXT DEFAULT 'فعال'
     )""");
     await _createExtraTables(db);
+    await _upgradeToV4(db);
     await db.insert('settings', {'key':'school_name','value':'شلک منځنی ښوونځی'});
     await db.insert('settings', {'key':'academic_year','value':'۱۴۰۵'});
   }
