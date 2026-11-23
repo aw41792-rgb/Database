@@ -1,4 +1,6 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:io';
 import '../data/school_database.dart';
 
 class ModuleField {
@@ -411,6 +413,58 @@ class _SettingsScreenState extends State<SettingsScreen>{
     if(!mounted)return;
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تنظیمات خوندي شول')));
   }
+
+  Future<void> _createBackup() async {
+    try {
+      final source = await SchoolDatabase.instance.prepareBackupFile();
+      final bytes = await source.readAsBytes();
+      final now = DateTime.now();
+      final stamp = '${now.year}${now.month.toString().padLeft(2,'0')}${now.day.toString().padLeft(2,'0')}_${now.hour.toString().padLeft(2,'0')}${now.minute.toString().padLeft(2,'0')}';
+      final path = await FilePicker.platform.saveFile(
+        dialogTitle: 'د ښوونځي د معلوماتو بیک‌اپ خوندي کړئ',
+        fileName: 'Shalak_School_Backup_$stamp.db',
+        type: FileType.custom,
+        allowedExtensions: ['db'],
+        bytes: bytes,
+      );
+      if (!mounted) return;
+      if (path != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('بیک‌اپ په بریالیتوب جوړ شو')));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('بیک‌اپ جوړ نه شو: $e')));
+    }
+  }
+
+  Future<void> _restoreBackup() async {
+    final choice = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('د معلوماتو بېرته راګرځول'),
+        content: const Text('د بیک‌اپ په راګرځولو سره اوسني معلومات د بیک‌اپ له معلوماتو سره بدلېږي. مخکې له دې د اوسنیو معلوماتو بیک‌اپ جوړ کړئ. دوام ورکوئ؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('نه')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('هو، دوام ورکړه')),
+        ],
+      ),
+    );
+    if (choice != true) return;
+    try {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.custom, allowedExtensions: ['db'], withData: false);
+      if (picked == null || picked.files.single.path == null) return;
+      await SchoolDatabase.instance.restoreFromBackup(File(picked.files.single.path!));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('معلومات په بریالیتوب بېرته را وګرځېدل')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('معلومات بېرته را و نه ګرځېدل: $e')));
+    }
+  }
+
   @override Widget build(BuildContext context)=>Scaffold(
     appBar:AppBar(title:const Text('د ښوونځي تنظیمات')),
     body:loading?const Center(child:CircularProgressIndicator()):ListView(padding:const EdgeInsets.all(16),children:[
@@ -421,6 +475,13 @@ class _SettingsScreenState extends State<SettingsScreen>{
       TextField(controller:year,decoration:const InputDecoration(labelText:'تعلیمي کال')),
       const SizedBox(height:16),
       FilledButton.icon(onPressed:_save,icon:const Icon(Icons.save),label:const Text('تنظیمات خوندي کول')),
+      const SizedBox(height:20),
+      const Divider(),
+      const Text('د معلوماتو ساتنه',style:TextStyle(fontSize:18,fontWeight:FontWeight.w800)),
+      const SizedBox(height:10),
+      FilledButton.icon(onPressed:_createBackup,icon:const Icon(Icons.backup_rounded),label:const Text('بیک‌اپ جوړول او خوندي کول')),
+      const SizedBox(height:8),
+      OutlinedButton.icon(onPressed:_restoreBackup,icon:const Icon(Icons.settings_backup_restore_rounded),label:const Text('له بیک‌اپ څخه معلومات راګرځول')),
       const SizedBox(height:20),
       const Card(child:Padding(padding:EdgeInsets.all(14),child:Text(
         'معلومات په همدې موبایل کې په محلي ډیټابیس کې ساتل کېږي. د اپلیکیشن له حذفولو مخکې د معلوماتو د بیک‌اپ جوړول اړین دي.',
