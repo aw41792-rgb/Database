@@ -401,6 +401,69 @@ class SchoolDatabase {
     return results;
   }
 
+
+  Future<File> prepareBackupFile() async {
+    final db = await database;
+    await db.execute('PRAGMA wal_checkpoint(FULL)');
+    final root = await getDatabasesPath();
+    final file = File(p.join(root, 'shalak_school.db'));
+    if (!await file.exists() || await file.length() == 0) {
+      throw Exception('د معلوماتو ډیټابېس ونه موندل شو');
+    }
+    return file;
+  }
+
+  Future<void> restoreFromBackup(File source) async {
+    if (!await source.exists() || await source.length() < 100) {
+      throw ArgumentError('د بیک‌اپ فایل ناسم یا تش دی');
+    }
+    final root = await getDatabasesPath();
+    final targetPath = p.join(root, 'shalak_school.db');
+    final tempPath = p.join(root, 'shalak_school_restore_check.db');
+    final tempFile = File(tempPath);
+    if (await tempFile.exists()) await tempFile.delete();
+    await source.copy(tempPath);
+
+    Database? checkDb;
+    try {
+      checkDb = await openDatabase(tempPath, readOnly: true);
+      final integrity = await checkDb.rawQuery('PRAGMA integrity_check');
+      if (integrity.isEmpty || integrity.first.values.first != 'ok') {
+        throw ArgumentError('د بیک‌اپ ډیټابېس روغ نه دی');
+      }
+      final tables = await checkDb.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table'");
+      final names = tables.map((row) => row['name']).whereType<String>().toSet();
+      if (!names.containsAll({'students', 'teachers', 'settings'})) {
+        throw ArgumentError('دا د ښوونځي د سیستم بیک‌اپ نه دی');
+      }
+    } finally {
+      await checkDb?.close();
+    }
+
+    final current = _database;
+    if (current != null) {
+      await current.execute('PRAGMA wal_checkpoint(FULL)');
+      await current.close();
+    }
+    _database = null;
+    _databaseOpening = null;
+
+    final target = File(targetPath);
+    if (await target.exists()) {
+      final safetyPath = p.join(root,
+        'shalak_school_before_restore_${DateTime.now().millisecondsSinceEpoch}.db');
+      await target.copy(safetyPath);
+    }
+    final wal = File('$targetPath-wal');
+    final shm = File('$targetPath-shm');
+    if (await wal.exists()) await wal.delete();
+    if (await shm.exists()) await shm.delete();
+    await tempFile.copy(targetPath);
+    await tempFile.delete();
+    await database;
+  }
+
   Future<Map<String,String>> getSettings() async {
     final rows=await (await database).query('settings');
     return {for(final r in rows) r['key'] as String:r['value'] as String};
