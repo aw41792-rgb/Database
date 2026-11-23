@@ -259,6 +259,13 @@ class SchoolDatabase {
     String? district, String? village, String? guardian,
     String? guardianPhone, String status='فعال',
   }) async {
+    if (basisNumber.trim().isEmpty || name.trim().isEmpty || fatherName.trim().isEmpty) {
+      throw ArgumentError('اساس نمبر، نوم او د پلار نوم اړین دي');
+    }
+    if (grade < 1 || grade > 12 || (admissionGrade != null && (admissionGrade < 1 || admissionGrade > 12))) {
+      throw ArgumentError('ټولګی باید له ۱ تر ۱۲ پورې وي');
+    }
+    if (!{'سهار','ماسپښين','ماښام'}.contains(shift)) throw ArgumentError('د زده‌کړې وخت ناسم دی');
     return (await database).insert('students', {
       'basis_number':basisNumber.trim(),'name':name.trim(),
       'father_name':fatherName.trim(),'grandfather_name':grandfatherName,
@@ -402,6 +409,8 @@ class SchoolDatabase {
   Future<void> recordInventoryMove(int itemId,String type,double quantity,String date,
       {String? receiver,String? documentNo,String? note}) async {
     if(quantity<=0) throw ArgumentError('اندازه باید له صفر څخه زیاته وي');
+    if(!{'داخل','مصرف'}.contains(type)) throw ArgumentError('د جنس د حرکت ډول ناسم دی');
+    if(date.trim().isEmpty) throw ArgumentError('د جنس د حرکت نېټه اړینه ده');
     final db=await database;
     await db.transaction((txn) async {
       final found=await txn.query('inventory',where:'id=?',whereArgs:[itemId],limit:1);
