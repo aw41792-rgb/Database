@@ -308,6 +308,47 @@ class SchoolDatabase {
     });
   }
 
+  Future<List<Map<String,Object?>>> globalSearch(String query) async {
+    final q=query.trim();
+    if(q.length<2) return [];
+    final db=await database;
+    final pattern='%$q%';
+    final results=<Map<String,Object?>>[];
+    final students=await db.rawQuery(
+      "SELECT id,basis_number,name,father_name,grade,village FROM students "
+      "WHERE name LIKE ? OR father_name LIKE ? OR grandfather_name LIKE ? OR basis_number LIKE ? OR guardian LIKE ? OR guardian_phone LIKE ? "
+      "ORDER BY name LIMIT 30",
+      [pattern,pattern,pattern,pattern,pattern,pattern]);
+    for(final r in students) {
+      results.add({'type':'زده‌کوونکی','title':'${r['name']}','subtitle':'اساس نمبر: ${r['basis_number']} • پلار: ${r['father_name']} • ټولګی: ${r['grade']}','id':r['id']});
+    }
+    final teachers=await db.rawQuery(
+      "SELECT id,teacher_no,name,father_name,subject FROM teachers "
+      "WHERE name LIKE ? OR father_name LIKE ? OR teacher_no LIKE ? OR subject LIKE ? OR phone LIKE ? "
+      "ORDER BY name LIMIT 20",
+      [pattern,pattern,pattern,pattern,pattern]);
+    for(final r in teachers) {
+      results.add({'type':'ښوونکی','title':'${r['name']}','subtitle':'شمېره: ${r['teacher_no']??'—'} • مضمون: ${r['subject']??'—'}','id':r['id']});
+    }
+    final letters=await db.rawQuery(
+      "SELECT id,letter_number,subject,letter_date FROM letters "
+      "WHERE letter_number LIKE ? OR subject LIKE ? OR body LIKE ? OR sender LIKE ? OR receiver LIKE ? "
+      "ORDER BY letter_date DESC LIMIT 20",
+      [pattern,pattern,pattern,pattern,pattern]);
+    for(final r in letters) {
+      results.add({'type':'مکتوب','title':'${r['subject']}','subtitle':'شمېره: ${r['letter_number']??'—'} • نېټه: ${r['letter_date']}','id':r['id']});
+    }
+    final items=await db.rawQuery(
+      "SELECT id,item_name,category,quantity,unit FROM inventory "
+      "WHERE item_name LIKE ? OR category LIKE ? OR unit LIKE ? "
+      "ORDER BY item_name LIMIT 20",
+      [pattern,pattern,pattern]);
+    for(final r in items) {
+      results.add({'type':'جنس','title':'${r['item_name']}','subtitle':'ډول: ${r['category']??'—'} • موجودي: ${r['quantity']} ${r['unit']}','id':r['id']});
+    }
+    return results;
+  }
+
   Future<Map<String,String>> getSettings() async {
     final rows=await (await database).query('settings');
     return {for(final r in rows) r['key'] as String:r['value'] as String};
