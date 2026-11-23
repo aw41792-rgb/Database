@@ -151,7 +151,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     body: Column(children: [
       Padding(
         padding: const EdgeInsets.all(12),
-        child: TextFormField(initialValue: date, decoration: const InputDecoration(labelText: 'نېټه (YYYY-MM-DD)'), onChanged: (v) { date = v; _load(); }),
+        child: TextFormField(
+          initialValue: date,
+          decoration: const InputDecoration(labelText: 'نېټه (YYYY-MM-DD)'),
+          onChanged: (v) { date = v; },
+          onFieldSubmitted: (_) => _load(),
+        ),
       ),
       Expanded(child: students.isEmpty
         ? const Center(child: Text('لومړی زده‌کوونکي ثبت کړئ'))
