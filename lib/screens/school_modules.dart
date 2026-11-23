@@ -207,10 +207,21 @@ class _ResultsScreenState extends State<ResultsScreen> {
     if(mounted)setState((){students=s;exams=e;results=r;});
   }
   Future<void> _save() async {
-    if(studentId==null||examId==null||subject.text.trim().isEmpty||num.tryParse(score.text)==null)return;
-    await SchoolDatabase.instance.insert('results',{'student_id':studentId,'exam_id':examId,'subject':subject.text.trim(),'score':num.parse(score.text)});
-    subject.clear();score.clear();await _load();
-    if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('نمره ثبت شوه')));
+    final parsed = double.tryParse(score.text.trim());
+    if(studentId==null || examId==null || subject.text.trim().isEmpty || parsed==null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('زده‌کوونکی، ازموینه، مضمون او سمه نمره وټاکئ')));
+      return;
+    }
+    try {
+      await SchoolDatabase.instance.saveResult(
+        studentId: studentId!, examId: examId!,
+        subject: subject.text, score: parsed,
+      );
+      subject.clear(); score.clear(); await _load();
+      if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('نمره په بریالیتوب ثبت شوه')));
+    } catch(e) {
+      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('نمره ثبت نه شوه: $e')));
+    }
   }
   @override Widget build(BuildContext context)=>Scaffold(
     appBar:AppBar(title:const Text('د ازموینو پایلې او نمرې')),
@@ -222,7 +233,10 @@ class _ResultsScreenState extends State<ResultsScreen> {
       const SizedBox(height:8),TextField(controller:score,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'ترلاسه شوې نمرې')),
       const SizedBox(height:8),FilledButton.icon(onPressed:_save,icon:const Icon(Icons.save),label:const Text('نمرې ثبتول')),
       const Divider(height:28),const Text('ثبت شوې پایلې',style:TextStyle(fontWeight:FontWeight.bold,fontSize:18)),
-      for(final r in results) ListTile(title:Text('مضمون: ${r['subject']}'),subtitle:Text('زده‌کوونکی ID: ${r['student_id']} • ازموینه ID: ${r['exam_id']} • نمرې: ${r['score']}')),
+      for(final r in results) ListTile(
+        title:Text('مضمون: ${r['subject']}'),
+        subtitle:Text('زده‌کوونکی: ${students.where((s)=>s['id']==r['student_id']).map((s)=>s['name']).firstOrNull ?? 'ناڅرګند'} • ازموینه: ${exams.where((e)=>e['id']==r['exam_id']).map((e)=>e['title']).firstOrNull ?? 'ناڅرګنده'} • نمرې: ${r['score']}'),
+      ),
     ]),
   );
 }
