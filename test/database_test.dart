@@ -101,7 +101,7 @@ void main() {
     final db = SchoolDatabase.instance;
     final teacherId = await db.insert('teachers', {
       'name': 'د حاضري ازمایښتي ښوونکی',
-      'teacher_no': 'T-' + DateTime.now().microsecondsSinceEpoch.toString(),
+      'teacher_no': 'T-${DateTime.now().microsecondsSinceEpoch}',
     });
     await expectLater(
       db.recordStaffAttendance(teacherId, '۱۴۰۵/۰۱/۰۱', 'ناسم'),
