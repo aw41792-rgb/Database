@@ -164,7 +164,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 title: Text('${student['name']}'),
                 subtitle: Text('${student['basis_number']} • ${student['grade']} ټولګی'),
                 trailing: DropdownButton<String>(
-                  value: chosen[id] ?? 'حاضر',
+                  value: chosen[id],
+                  hint: const Text('وټاکئ'),
                   items: const ['حاضر', 'غیر حاضر', 'رخصت', 'مریض'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
                   onChanged: (v) => setState(() { chosen[id] = v ?? 'حاضر'; }),
                 ),
@@ -176,9 +177,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         padding: const EdgeInsets.all(12),
         child: FilledButton.icon(
           onPressed: () async {
+            if (date.trim().isEmpty || students.any((student) => !chosen.containsKey(student['id'] as int))) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('نېټه او د ټولو زده‌کوونکو حاضري وټاکئ؛ ناتکمیل معلومات نه ثبتېږي.')));
+              return;
+            }
             for (final student in students) {
               final id = student['id'] as int;
-              await SchoolDatabase.instance.recordAttendance(id, date, chosen[id] ?? 'حاضر');
+              await SchoolDatabase.instance.recordAttendance(id, date.trim(), chosen[id]!);
             }
             if (!context.mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('حاضري ثبت شوه')));
@@ -346,9 +351,13 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
     }
   }
   Future<void> _save() async {
+    if(date.trim().isEmpty || teachers.any((teacher)=>!chosen.containsKey(teacher['id'] as int))){
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('نېټه او د ټولو ښوونکو حاضري وټاکئ؛ ناتکمیل معلومات نه ثبتېږي.')));
+      return;
+    }
     for(final t in teachers){
       final id=t['id'] as int;
-      await SchoolDatabase.instance.recordStaffAttendance(id,date,chosen[id]??'حاضر');
+      await SchoolDatabase.instance.recordStaffAttendance(id,date.trim(),chosen[id]!);
     }
     if(!mounted)return;
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('د ښوونکو حاضري ثبت شوه')));
@@ -365,7 +374,8 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
           return ListTile(title:Text('${t['name']}'),
             subtitle:Text('${t['subject']??'مضمون نه دی ثبت'}'),
             trailing:DropdownButton<String>(
-              value:chosen[id]??'حاضر',
+              value:chosen[id],
+              hint:const Text('وټاکئ'),
               items:const ['حاضر','غیر حاضر','رخصت','مریض'].map((v)=>DropdownMenuItem(value:v,child:Text(v))).toList(),
               onChanged:(v)=>setState(()=>chosen[id]=v??'حاضر')));
         })),
