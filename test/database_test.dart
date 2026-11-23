@@ -114,4 +114,65 @@ void main() {
     ), isTrue);
   });
 
+
+  test('زده‌کوونکی باید له ۱ تر ۱۲ ټولګي او اړینو معلوماتو سره ثبت شي', () async {
+    final db = SchoolDatabase.instance;
+    await expectLater(
+      db.addStudent(
+        basisNumber: 'BAD-GRADE-${DateTime.now().microsecondsSinceEpoch}',
+        name: 'ناسم ټولګی',
+        fatherName: 'ازمایښتي',
+        grade: 13,
+        shift: 'سهار',
+      ),
+      throwsArgumentError,
+    );
+    await expectLater(
+      db.addStudent(
+        basisNumber: '',
+        name: 'بې اساس نمبر',
+        fatherName: 'ازمایښتي',
+        grade: 1,
+        shift: 'سهار',
+      ),
+      throwsArgumentError,
+    );
+  });
+
+  test('د ګدام حرکت باید یوازې داخل یا مصرف او مثبته اندازه ولري', () async {
+    final db = SchoolDatabase.instance;
+    final itemId = await db.insert('inventory', {
+      'item_name': 'ازمایښتي کاغذ',
+      'quantity': 10,
+      'unit': 'بسته',
+    });
+    await expectLater(
+      db.recordInventoryMove(itemId, 'نامعلوم', 1, '۱۴۰۵/۰۱/۰۱'),
+      throwsArgumentError,
+    );
+    await expectLater(
+      db.recordInventoryMove(itemId, 'مصرف', 0, '۱۴۰۵/۰۱/۰۱'),
+      throwsArgumentError,
+    );
+    await db.recordInventoryMove(itemId, 'مصرف', 3, '۱۴۰۵/۰۱/۰۱');
+    final items = await db.rows('inventory', orderBy: 'id DESC');
+    expect(items.first['quantity'], 7);
+  });
+
+  test('ثبت شوي زده‌کوونکي باید د تاریخچې په شتون کې حذف نه شي', () async {
+    final db = SchoolDatabase.instance;
+    final stamp = DateTime.now().microsecondsSinceEpoch.toString();
+    final studentId = await db.addStudent(
+      basisNumber: 'SAFE-DELETE-$stamp',
+      name: 'د حذف ساتنې ازموینه',
+      fatherName: 'ازمایښتي',
+      grade: 1,
+      shift: 'سهار',
+    );
+    await db.recordAttendance(studentId, '۱۴۰۵/۰۱/۰۳', 'حاضر');
+    await expectLater(db.remove('students', studentId), throwsA(anything));
+    final students = await db.getStudents(query: 'SAFE-DELETE-$stamp');
+    expect(students.any((s) => s['id'] == studentId), isTrue);
+  });
+
 }
