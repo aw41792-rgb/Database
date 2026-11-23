@@ -78,8 +78,16 @@ class _StudentsScreenState extends State<StudentsScreen> {
                         keyboardType: ['admission_age','admission_grade','grade'].contains(keys[i])
                             ? TextInputType.number : TextInputType.text,
                         decoration: InputDecoration(labelText: labels[i]),
-                        validator: ['basis_number','name','father_name','grade','shift'].contains(keys[i])
-                            ? _required : null,
+                        validator: keys[i] == 'grade'
+                            ? (value) {
+                                final grade = int.tryParse(value?.trim() ?? '');
+                                if (grade == null || grade < 1 || grade > 12) {
+                                  return 'ټولګی باید له ۱ څخه تر ۱۲ پورې وي';
+                                }
+                                return null;
+                              }
+                            : ['basis_number','name','father_name','shift'].contains(keys[i])
+                                ? _required : null,
                       ),
                     ),
                 ],
