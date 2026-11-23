@@ -275,10 +275,17 @@ class SchoolDatabase {
       columns:['student_id','status'],where:'attendance_date=?',whereArgs:[date]);
     return {for(final x in r) x['student_id'] as int:x['status'] as String};
   }
-  Future<void> recordAttendance(int studentId,String date,String status) async =>
-      (await database).insert('attendance',{
-        'student_id':studentId,'attendance_date':date,'status':status,
-      },conflictAlgorithm:ConflictAlgorithm.replace);
+  Future<void> recordAttendance(int studentId,String date,String status) async {
+    const allowed = {'حاضر','غیر حاضر','رخصت','مریض'};
+    if (date.trim().isEmpty) throw ArgumentError('د حاضري نېټه اړینه ده');
+    if (!allowed.contains(status)) throw ArgumentError('د حاضري حالت ناسم دی');
+    final db = await database;
+    final student = await db.query('students', columns:['id'], where:'id=?', whereArgs:[studentId], limit:1);
+    if (student.isEmpty) throw ArgumentError('زده‌کوونکی ونه موندل شو');
+    await db.insert('attendance',{
+      'student_id':studentId,'attendance_date':date.trim(),'status':status,
+    },conflictAlgorithm:ConflictAlgorithm.replace);
+  }
 
   Future<void> saveResult({required int studentId, required int examId, required String subject, required double score}) async {
     final db = await database;
@@ -323,10 +330,17 @@ class SchoolDatabase {
       columns:['teacher_id','status'],where:'attendance_date=?',whereArgs:[date]);
     return {for(final x in r) x['teacher_id'] as int:x['status'] as String};
   }
-  Future<void> recordStaffAttendance(int teacherId,String date,String status) async =>
-      (await database).insert('staff_attendance',{
-        'teacher_id':teacherId,'attendance_date':date,'status':status,
-      },conflictAlgorithm:ConflictAlgorithm.replace);
+  Future<void> recordStaffAttendance(int teacherId,String date,String status) async {
+    const allowed = {'حاضر','غیر حاضر','رخصت','مریض'};
+    if (date.trim().isEmpty) throw ArgumentError('د حاضري نېټه اړینه ده');
+    if (!allowed.contains(status)) throw ArgumentError('د حاضري حالت ناسم دی');
+    final db = await database;
+    final teacher = await db.query('teachers', columns:['id'], where:'id=?', whereArgs:[teacherId], limit:1);
+    if (teacher.isEmpty) throw ArgumentError('ښوونکی ونه موندل شو');
+    await db.insert('staff_attendance',{
+      'teacher_id':teacherId,'attendance_date':date.trim(),'status':status,
+    },conflictAlgorithm:ConflictAlgorithm.replace);
+  }
 
   Future<void> recordInventoryMove(int itemId,String type,double quantity,String date,
       {String? receiver,String? documentNo,String? note}) async {
