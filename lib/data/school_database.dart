@@ -280,6 +280,44 @@ class SchoolDatabase {
         'student_id':studentId,'attendance_date':date,'status':status,
       },conflictAlgorithm:ConflictAlgorithm.replace);
 
+  Future<void> saveResult({required int studentId, required int examId, required String subject, required double score}) async {
+    final db = await database;
+    final exam = await db.query('exams', columns: ['max_score'], where: 'id=?', whereArgs: [examId], limit: 1);
+    if (exam.isEmpty) throw Exception('ازموینه ونه موندل شوه');
+    final maxScore = (exam.first['max_score'] as num?)?.toDouble() ?? 100;
+    if (score < 0 || score > maxScore) {
+      throw ArgumentError('نمرې باید له صفر څخه تر $maxScore پورې وي');
+    }
+    final student = await db.query('students', columns: ['id'], where: 'id=?', whereArgs: [studentId], limit: 1);
+    if (student.isEmpty) throw Exception('زده‌کوونکی ونه موندل شو');
+    if (subject.trim().isEmpty) throw ArgumentError('د مضمون نوم اړین دی');
+    await db.insert('results', {
+      'student_id': studentId,
+      'exam_id': examId,
+      'subject': subject.trim(),
+      'score': score,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<Map<String,double>> financeSummary() async {
+    final rows = await (await database).rawQuery(
+      "SELECT transaction_type, COALESCE(SUM(amount),0) AS total FROM finance GROUP BY transaction_type");
+    double income = 0, expense = 0;
+    for (final row in rows) {
+      final amount = (row['total'] as num).toDouble();
+      final type = '${row['transaction_type']}';
+      if (type == 'عواید' || type == 'عاید' || type == 'داخل') income += amount;
+      if (type == 'لګښت' || type == 'مصرف' || type == 'خارج') expense += amount;
+    }
+    return {'عواید': income, 'لګښت': expense, 'پاتې': income - expense};
+  }
+
+  Future<Map<String,int>> attendanceTotals() async {
+    final rows = await (await database).rawQuery(
+      "SELECT status, COUNT(*) AS total FROM attendance GROUP BY status");
+    return {for (final row in rows) '${row['status']}': (row['total'] as num).toInt()};
+  }
+
   Future<Map<int,String>> staffAttendanceForDate(String date) async {
     final r=await (await database).query('staff_attendance',
       columns:['teacher_id','status'],where:'attendance_date=?',whereArgs:[date]);
