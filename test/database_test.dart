@@ -72,4 +72,46 @@ void main() {
     expect(summary['لګښت'], greaterThanOrEqualTo(250));
     expect(summary['پاتې'], greaterThanOrEqualTo(750));
   });
+  test('حاضري باید ټاکلی او معتبر حالت ولري', () async {
+    final db = SchoolDatabase.instance;
+    final stamp = DateTime.now().microsecondsSinceEpoch.toString();
+    final studentId = await db.addStudent(
+      basisNumber: 'ATT-$stamp',
+      name: 'د حاضري ازمایښتي زده‌کوونکی',
+      fatherName: 'ازمایښتي',
+      grade: 1,
+      shift: 'سهار',
+    );
+    await expectLater(
+      db.recordAttendance(studentId, '۱۴۰۵/۰۱/۰۱', 'نامعلوم'),
+      throwsArgumentError,
+    );
+    await expectLater(
+      db.recordAttendance(studentId, '', 'حاضر'),
+      throwsArgumentError,
+    );
+    await db.recordAttendance(studentId, '۱۴۰۵/۰۱/۰۱', 'غیر حاضر');
+    final records = await db.rows('attendance');
+    expect(records.any((r) =>
+      r['student_id'] == studentId && r['status'] == 'غیر حاضر'
+    ), isTrue);
+  });
+
+  test('د ښوونکي حاضري باید ناسم حالت ونه مني', () async {
+    final db = SchoolDatabase.instance;
+    final teacherId = await db.insert('teachers', {
+      'name': 'د حاضري ازمایښتي ښوونکی',
+      'teacher_no': 'T-' + DateTime.now().microsecondsSinceEpoch.toString(),
+    });
+    await expectLater(
+      db.recordStaffAttendance(teacherId, '۱۴۰۵/۰۱/۰۱', 'ناسم'),
+      throwsArgumentError,
+    );
+    await db.recordStaffAttendance(teacherId, '۱۴۰۵/۰۱/۰۱', 'حاضر');
+    final records = await db.rows('staff_attendance');
+    expect(records.any((r) =>
+      r['teacher_id'] == teacherId && r['status'] == 'حاضر'
+    ), isTrue);
+  });
+
 }
