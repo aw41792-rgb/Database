@@ -433,8 +433,10 @@ class _SettingsScreenState extends State<SettingsScreen>{
           const SnackBar(content: Text('بیک‌اپ په بریالیتوب جوړ شو')));
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('بیک‌اپ جوړ نه شو: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('بیک‌اپ جوړ نه شو: $e')));
+      }
     }
   }
 
@@ -460,8 +462,10 @@ class _SettingsScreenState extends State<SettingsScreen>{
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('معلومات په بریالیتوب بېرته را وګرځېدل')));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('معلومات بېرته را و نه ګرځېدل: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('معلومات بېرته را و نه ګرځېدل: $e')));
+      }
     }
   }
 
