@@ -276,13 +276,15 @@ class ReportsScreen extends StatefulWidget {
 class _ReportsScreenState extends State<ReportsScreen> {
   int students = 0, teachers = 0, exams = 0, letters = 0, inventory = 0;
   Map<String, int> grades = {}, attendance = {};
+  Map<String, double> finance = {};
   @override void initState() { super.initState(); _load(); }
   Future<void> _load() async {
     final db = SchoolDatabase.instance;
     final s = await db.studentCount(), t = await db.count('teachers'), e = await db.count('exams');
     final l = await db.count('letters'), inv = await db.count('inventory');
     final g = await db.gradeCounts(), a = await db.attendanceSummary();
-    if (mounted) setState(() { students=s; teachers=t; exams=e; letters=l; inventory=inv; grades=g; attendance=a; });
+    final f = await db.financeSummary();
+    if (mounted) setState(() { students=s; teachers=t; exams=e; letters=l; inventory=inv; grades=g; attendance=a; finance=f; });
   }
   @override Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('احصائیه او ګرافونه')),
@@ -290,6 +292,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
       Wrap(spacing: 8, runSpacing: 8, children: [
         _stat('زده‌کوونکي', students), _stat('ښوونکي', teachers), _stat('ازموینې', exams),
         _stat('مکتوبونه', letters), _stat('د اجناسو ډولونه', inventory),
+      ]),
+      const SizedBox(height: 20),
+      const Text('مالي لنډیز', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+      Wrap(spacing: 8, runSpacing: 8, children: [
+        _moneyStat('ټول عواید', finance['عواید'] ?? 0),
+        _moneyStat('ټول لګښتونه', finance['لګښت'] ?? 0),
+        _moneyStat('پاتې پیسې', finance['پاتې'] ?? 0),
       ]),
       const SizedBox(height: 20),
       const Text('د ټولګیو له مخې زده‌کوونکي', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -301,6 +310,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     ]),
   );
   Widget _stat(String label, int value) => SizedBox(width: 145, child: Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(children: [Text('$value', style: const TextStyle(fontSize: 25, fontWeight: FontWeight.bold)), Text(label)]))));
+  Widget _moneyStat(String label, double value) => SizedBox(width: 145, child: Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(children: [Text(value.toStringAsFixed(2), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), Text(label)]))));
   Widget _bar(String label, int value, int total) {
     final ratio = total == 0 ? 0.0 : value / total;
     return Padding(
