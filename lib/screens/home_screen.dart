@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import '../data/school_database.dart';
 import 'students_screen.dart';
 import 'school_modules.dart';
+import 'global_search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -53,6 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('شلک منځنی ښوونځی', style: TextStyle(fontWeight: FontWeight.w800)),
         actions: [
+          IconButton(tooltip: 'عمومي لټون', onPressed: () => _open(const GlobalSearchScreen()), icon: const Icon(Icons.search_rounded)),
           IconButton(tooltip: 'تازه کول', onPressed: _refresh, icon: const Icon(Icons.refresh_rounded)),
           IconButton(tooltip: 'راپورونه', onPressed: () => _open(const ReportsScreen()), icon: const Icon(Icons.analytics_outlined)),
         ],
